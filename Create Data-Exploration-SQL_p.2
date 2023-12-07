@@ -1,0 +1,97 @@
+USE magist;
+SELECT * FROM products;
+SELECT * FROM geo;
+SELECT * FROM orders;
+SELECT * FROM order_payments;
+SELECT * 
+FROM order_items 
+WHERE 
+	price > 400;
+
+SELECT 
+    order_id,
+    MAX(shipping_limit_date),
+    MIN(shipping_limit_date),
+    CAST(AVG(shipping_limit_date) AS DATETIME)
+FROM
+    order_items
+GROUP BY order_id
+HAVING (MAX(shipping_limit_date) != MIN(shipping_limit_date));
+
+
+-- PRODUCTS
+-- -- How many products are there on the products table? -- -- 32951
+SELECT 
+    COUNT(DISTINCT product_id) AS number_of_products
+FROM
+    products;
+
+
+-- How many of those products were present in actual transactions? -- -- 32951 (same as quantity from product catalogue)
+SELECT 
+    COUNT(DISTINCT product_id) AS n_products
+FROM
+    order_items;
+
+-- -- What categories of tech products does Magist have? -------------------------------------------------------------
+SELECT 
+    rt.product_category_name_english,
+    COUNT(DISTINCT lt.product_id) AS n_products
+FROM
+    products AS lt
+LEFT JOIN
+    product_category_name_translation AS rt 
+    ON lt.product_category_name = rt.product_category_name
+GROUP BY rt.product_category_name
+HAVING rt.product_category_name_english IN
+	('computers_accessories' , 
+    'telephony',
+    'electronics',
+    'audio',
+    'computers'
+    )
+ORDER BY n_products DESC;
+
+
+-- How many products of these tech categories have been sold (within the time window of the database snapshot)? 
+-- What percentage does that represent from the overall number of products sold? What’s the average price of the products being sold?
+SELECT 
+    t2.product_category_name_english,
+    COUNT(t3.price) AS category_sales_qty,
+    ROUND(SUM(t3.price)) AS category_sales,
+    ROUND(AVG(t3.price), 2) AS average_price_in_category,
+    MAX(t3.price) AS max_category_price,
+    MIN(t3.price) AS min_category_price
+FROM
+    products AS t1
+        LEFT JOIN
+    product_category_name_translation AS t2 ON t1.product_category_name = t2.product_category_name
+        LEFT JOIN
+    order_items AS t3 ON t1.product_id = t3.product_id
+GROUP BY t2.product_category_name_english
+HAVING t2.product_category_name_english IN ('computers_accessories' , 'telephony',
+    'electronics',
+    'audio',
+    'computers')
+ORDER BY category_sales DESC;
+
+
+-- Are expensive tech products popular? *
+SELECT 
+    t2.product_category_name_english,
+    COUNT(t3.price) AS category_sales_qty,
+    ROUND(SUM(t3.price)) AS category_sales,
+    ROUND(AVG(t3.price), 2) AS average_price_in_category
+FROM
+    products AS t1
+        LEFT JOIN
+    product_category_name_translation AS t2 ON t1.product_category_name = t2.product_category_name
+        LEFT JOIN
+    order_items AS t3 ON t1.product_id = t3.product_id
+GROUP BY t2.product_category_name_english
+HAVING t2.product_category_name_english IN ('computers_accessories' , 'telephony',
+    'electronics',
+    'audio',
+    'computers')
+ORDER BY category_sales DESC;
+	
