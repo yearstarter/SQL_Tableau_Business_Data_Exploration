@@ -1,0 +1,199 @@
+USE magist;
+SELECT * FROM geo;
+SELECT * FROM orders;
+SELECT * FROM order_payments;
+SELECT * FROM order_items;
+SELECT * FROM products;
+
+
+-- Is Magist having user growth? -- NOT REALLY, STAGNATION SINCE Nov 2017
+SELECT 
+    YEAR(lt.order_purchase_timestamp) AS YEAR,
+    MONTH(lt.order_purchase_timestamp) AS MONTH,
+    ROUND(SUM(rt.payment_value), 0) AS SALES
+FROM
+    orders AS lt
+        LEFT JOIN
+    order_payments AS rt ON lt.order_id = rt.order_id
+GROUP BY YEAR , MONTH
+ORDER BY YEAR , MONTH;
+
+
+-- WHY THERE IS A DIFFERENCE IN PAYMENT?
+SELECT 
+    ROUND(SUM(price), 0)
+FROM
+    order_items;-- '13591644'
+SELECT 
+    ROUND(SUM(price) + SUM(freight_value), 0) AS prices_and_freight_values
+FROM
+    order_items;-- '15843553'
+SELECT 
+    ROUND(SUM(payment_value), 0)
+FROM
+    order_payments; -- '16008872'
+
+-- -- how many ordres were delivered in time? what is the distribution of fact delivery time? 
+SELECT 
+    DATEDIFF(order_delivered_customer_date,
+            order_purchase_timestamp) AS delivery_time,
+    COUNT(order_delivered_customer_date)
+FROM
+    orders
+GROUP BY delivery_time
+ORDER BY delivery_time DESC;
+
+SELECT 
+	COUNT(*) AS orders_qty,
+	CASE
+		WHEN datediff(order_delivered_customer_date, order_purchase_timestamp) <= 5 THEN 'less than 5 days'
+		WHEN (datediff(order_delivered_customer_date, order_purchase_timestamp) > 5) AND (datediff(order_delivered_customer_date, order_purchase_timestamp) <= 10) THEN '5-10 days'
+		WHEN (datediff(order_delivered_customer_date, order_purchase_timestamp) > 10) AND (datediff(order_delivered_customer_date, order_purchase_timestamp) <= 15) THEN '10-15 days'
+		WHEN (datediff(order_delivered_customer_date, order_purchase_timestamp) > 15) AND (datediff(order_delivered_customer_date, order_purchase_timestamp) <= 20) THEN '15-20 days'
+		WHEN (datediff(order_delivered_customer_date, order_purchase_timestamp) > 20) AND (datediff(order_delivered_customer_date, order_purchase_timestamp) <= 25) THEN '20-25 days'
+		WHEN (datediff(order_delivered_customer_date, order_purchase_timestamp) > 25) AND (datediff(order_delivered_customer_date, order_purchase_timestamp) <= 30) THEN '25-30 days'
+		ELSE 'more than 30 days'
+	END AS delivery_time_category
+FROM orders
+GROUP BY delivery_time_category
+ORDER BY orders_qty DESC;
+
+-- -- sales vs product
+SELECT 
+    product_id,
+    ROUND(SUM(price), 2) AS sales,
+    ROUND(AVG(price), 2) AS price,
+    MAX(price),
+    MIN(price),
+    COUNT(price) AS sales_quantity
+FROM
+    order_items
+GROUP BY product_id
+ORDER BY SUM(price) DESC;
+
+-- -- sales vs product (distribution in bins)
+SELECT 
+    ROUND(SUM(price), 0) AS sales,
+    COUNT(price) AS sales_qty,
+    CASE
+        WHEN price <= 200 THEN '0-200'
+        WHEN price BETWEEN 200 AND 400 THEN '200-400'
+        WHEN price BETWEEN 400 AND 600 THEN '400-600'
+        ELSE '600-..'
+    END AS price_category
+FROM
+    order_items
+GROUP BY price_category
+ORDER BY price_category;
+
+
+-- How many orders are there in the dataset?:     99441 in orders, 98666 in order_items, 99440 in order_payments
+SELECT 
+    COUNT(DISTINCT order_id) AS orders_total_qualntity
+FROM
+    orders;
+SELECT 
+    COUNT(DISTINCT order_id) AS orders_total_qualntity
+FROM
+    order_items;
+SELECT 
+    COUNT(DISTINCT order_id) AS orders_total_qualntity
+FROM
+    order_payments;
+    
+    
+-- Are orders actually delivered? -------------------------- MAKE PERCENT VALUES HERE
+SELECT 
+    order_status, 
+    COUNT(*) AS orders
+FROM
+    orders
+GROUP BY order_status;
+    
+
+-- How many products are there on the products table? -- -- 32951
+	SELECT 
+		COUNT(DISTINCT product_id) AS number_of_products
+	FROM
+		products;
+        
+        
+-- How many of those products were present in actual transactions? -- -- 32951 (same as quantity from product catalogue)
+	SELECT 
+		count(DISTINCT product_id) AS n_products
+	FROM
+		order_items;
+
+
+-- Which are the CATEGORIES with the most products?
+	SELECT 
+		product_category_name,
+		COUNT(DISTINCT product_id) AS n_products
+	FROM
+		products
+	GROUP BY product_category_name
+	ORDER BY COUNT(product_id) DESC;
+
+-- -- WITH ENGLISH CATEGORY NAME
+	SELECT 
+		lt.product_category_name,
+		rt.product_category_name_english,
+		COUNT(DISTINCT lt.product_id) AS n_products
+	FROM
+		products as lt
+	LEFT JOIN product_category_name_translation AS rt ON lt.product_category_name = rt.product_category_name
+	GROUP BY lt.product_category_name
+	ORDER BY n_products DESC;
+
+
+-- What’s the price for the most expensive and cheapest products?
+SELECT 
+    MIN(price) AS cheapest, 
+    MAX(price) AS most_expensive
+FROM 
+    order_items;
+
+-- -- TOP 10s
+SELECT * FROM order_items
+ORDER BY price DESC LIMIT 10; 
+SELECT * FROM order_items
+ORDER BY price LIMIT 10;     
+
+
+-- What are the highest and lowest payment values?
+SELECT 
+    MAX(payment_value) as highest,
+    MIN(payment_value) as lowest
+FROM
+    order_payments;
+
+-- -- TOP 10s
+SELECT 
+    *
+FROM
+    order_payments
+ORDER BY payment_value DESC
+LIMIT 10;
+SELECT 
+    *
+FROM
+    order_payments
+WHERE
+    payment_type != 'voucher'
+        AND payment_type != 'not_defined'
+ORDER BY payment_value
+LIMIT 10;
+
+
+-- WHY ARE THE LOWEST PAYMENTS LESS THAN LOWEST PRICES?    
+SELECT 
+    lt.product_category_name,
+    rt.product_category_name_english,
+    COUNT(DISTINCT lt.product_id) AS n_products
+FROM
+    products AS lt
+        LEFT JOIN
+    product_category_name_translation AS rt ON product_category_name
+GROUP BY rt.product_category_name_english
+ORDER BY n_products DESC
+LIMIT 0 , 1000
